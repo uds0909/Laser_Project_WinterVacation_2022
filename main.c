@@ -93,7 +93,8 @@ SRAM_HandleTypeDef hsram3;
 //		{0x00,0x01,0x00,0x00,0x14,0x00,0x00,0x00,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xff},
 //		{0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xff}
 //};
-float PI = 3.14159265358979;
+
+//double PI = 3.14159265358979;
 float input_X = 0;
 float input_Y = 0;
 char *Test_Gcode[3][64] = {
@@ -437,7 +438,6 @@ int main(void)
 			}
 
 
-
 			/* Laser Output Control */
 			if(Laser_Flag == 1)
 			{
@@ -523,6 +523,7 @@ int main(void)
 					Scanner_Y_3.all = *((volatile uint16_t *)FPGA_BASE + 43);
 					Scanner_Z_3.all = *((volatile uint16_t *)FPGA_BASE + 44);
 				}
+
 				else
 				{
 					skip_cnt++;
@@ -532,57 +533,79 @@ int main(void)
 			if(Scanner_Control.Flag == 1)
 			{
 				Scanner_Correction(&Scanner_Control);
-				Scanner_Line_Draw(&Scanner_Control);
+				//Scanner_Line_Draw(&Scanner_Control);
+				Scanner_Line_Draw_Re(&Scanner_Control);
+				//Scanner_Line_Draw_RERE(&Scanner_Control);
 				Scanner_Wobble_Circle(&Scanner_Control);
-
-
-				//Scanner_Control.Scan_x_wobble = Scanner_Control.Scan_x_temp + Scanner_Control.Radius * Scanner_Control.Scan_x_scale_mm;
-				//Scanner_Control.Scan_y_wobble = Scanner_Control.Scan_y_temp + Scanner_Control.Radius * Scanner_Control.Scan_y_scale_mm;
-
-
-				//Scanner_Control.Scan_x_wobble = Scanner_Control.Scan_x_temp;
-				//Scanner_Control.Scan_y_wobble = Scanner_Control.Scan_y_temp;
 			}
 
-			if(Center_Wobble_Flag == 1)
+		/*	if(Center_Wobble_Flag == 1)
 			{
 				Scanner_Correction(&Scanner_Control);
 				Scanner_Line_Draw(&Scanner_Control);
 				Scanner_Wobble_Circle(&Scanner_Control);
-			}
+			}   */
 
-//			if(Scanner_Control.Circle_Flag == 1){
-//				Scanner_Correction(&Scanner_Control);
-//				Scanner_Line_Draw(&Scanner_Control);
-//			}
-
-
-			if(Scanner_Control.Circle_Flag == 1 && Scanner_Control.Flag == 0){
-				//Scanner_Circle_Draw(&Scanner_Control);
-				// 나중에는 숫자넣으면 특정 도형만들도록 할 수도 있을듯.
+			if(Scanner_Control.Figure_Flag == 1 && Scanner_Control.Flag == 0){
 				if(Test_Count == 1){
 					Laser_Flag = 1;
 				}
 
 				if(Scanner_Control.direction == 0){
-					Scanner_Control.Angle = Test_Count * 2 * PI / 720;
+					if(Scanner_Control.Figure_Angle >= 7){
+						Scanner_Control.Angle = Test_Count * 2 * Scanner_Control.PI / 720;
+
+						input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+						input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+					}else{
+						Scanner_Control.Angle = Test_Count * 2 * Scanner_Control.PI / Scanner_Control.Figure_Angle;
+
+						//Scanner_Control.Scan_radius_dist_x = Scanner_Control.Scan_radius;// * Scanner_Control.Scan_x_scale_mm;
+						//Scanner_Control.Scan_radius_dist_y = Scanner_Control.Scan_radius;// * Scanner_Control.Scan_y_scale_mm;
+
+						input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+						input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+						//aaaaaa+=120;
+					}
 				}
 				else{
-					Scanner_Control.Angle = (720 - Test_Count) * 2 * PI / 720;
+					if(Scanner_Control.Figure_Angle >= 7){
+						Scanner_Control.Angle = (720 - Test_Count) * 2 * Scanner_Control.PI / 720;
+
+						input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+						input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+					}else{
+						Scanner_Control.Angle = (Scanner_Control.Figure_Angle - Test_Count) * 2 * Scanner_Control.PI / Scanner_Control.Figure_Angle;
+
+						Scanner_Control.Scan_radius_dist_x = Scanner_Control.Scan_radius; //* Scanner_Control.Scan_x_scale_mm;
+						Scanner_Control.Scan_radius_dist_y = Scanner_Control.Scan_radius; //* Scanner_Control.Scan_y_scale_mm;
+
+						//input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius_dist_x;
+						//input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius_dist_y;
+					}
 				}
 
-				input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
-				input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+//				input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+//				input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
+
 
 				Scanner_Control.Scan_x = input_X;
 				Scanner_Control.Scan_y = input_Y;
 				Scanner_Control.Flag = 1;
 
 				Test_Count++;
-				if(Test_Count > 720){
-					Test_Count = 0;
-					Laser_Flag = 0;
-					Scanner_Control.Circle_Flag = 0;
+				if(Scanner_Control.Figure_Angle >= 7){
+					if(Test_Count > 720){
+							Test_Count = 0;
+							Laser_Flag = 0;
+							Scanner_Control.Figure_Flag = 0;
+					}
+				}else{
+					if(Test_Count > (Scanner_Control.Figure_Angle + 1)){    // Test_Count > (Scanner_Control.Figure_Angle + 1)
+							Test_Count = 0;
+							Laser_Flag = 0;
+							Scanner_Control.Figure_Flag = 0;
+					}
 				}
 
 
