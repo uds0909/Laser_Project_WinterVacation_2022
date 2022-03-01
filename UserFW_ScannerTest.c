@@ -14,7 +14,7 @@ int Correction_Count_height = 0;
 int Correction_Count_width = 0;
 float abcd = 0;
 double sqrt_xy = 0;
-int Delta_T = 2; // 현재는 일단 10Khz에 해당하는 것으로 정해서
+int Delta_T = 1; // 현재는 일단 10Khz에 해당하는 것으로 정해서
 float Degree = 0;
 
 
@@ -346,19 +346,18 @@ void Scanner_Line_Draw(_Scanner_Control* in)
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 void Scanner_Line_Draw_Re(_Scanner_Control* in){
 
-	if((in->Scan_x != 0) && (in->Scan_y != 0)){
-			if(in->Scan_x !=in->Scan_y){
-				if(in->Scan_x > in->Scan_y){
-					in->Scan_stepsize_x = 1 * (in->Scan_x / in->Scan_y);
-				}else{
-					in->Scan_stepsize_y = 1 * (in->Scan_y / in->Scan_x);
-				}
-			}else{
-				in->Scan_stepsize_x = 1;
-				in->Scan_stepsize_y = 1;
-			}
-		}
-
+//	if((in->Scan_x != 0) && (in->Scan_y != 0)){
+//			if(in->Scan_x !=in->Scan_y){
+//				if(in->Scan_x > in->Scan_y){
+//					in->Scan_stepsize_x = 1 * (in->Scan_x / in->Scan_y);
+//				}else{
+//					in->Scan_stepsize_y = 1 * (in->Scan_y / in->Scan_x);
+//				}
+//			}else{
+//				in->Scan_stepsize_x = 1;
+//				in->Scan_stepsize_y = 1;
+//			}
+//	}
 
 	/* 남은 거리 계산 */
 	in->Scan_x_remain_dist = (in->Scan_x_dist_virtual + 32767) - in->Scan_x_temp;
@@ -370,46 +369,46 @@ void Scanner_Line_Draw_Re(_Scanner_Control* in){
 	in->y_vel = in->Scan_stepsize_y * in->Scan_y_remain_dist / sqrt_xy;
 
 	//////////////////////////////////////////////////////////////////////////////////
-	if((in->Scan_x_dist_virtual != in->Scan_x_temp - 32767 ) && (in->Scan_X_Flag != 1))
+	if((in->Scan_x_dist_virtual != in->Scan_x_temp - 32767 ) && (in->Scan_X_Flag != 1) )   //  && (in->Scan_X_Flag != 1)
 	{
-		if(in->Scan_x_dist_virtual > in->Scan_x_temp - 32767)
+		if(in->Scan_x_dist_virtual + 32767 > in->Scan_x_temp)
 		{
-			in->aa += in->Scan_stepsize_x;
-			in->Scan_x_trans = in->aa + in->x_vel * Delta_T;   // N곱하는 부분 넣어야해
+			//in->aa += in->Scan_stepsize_x;
+			in->Scan_x_trans = in->Scan_x_temp + in->x_vel * Delta_T;   // N곱하는 부분 넣어야해   // in->aa 부분 추가되어있었어
 			in->Scan_x_temp = (int)(in->Scan_x_trans) + 32767;
 		}
 		else
 		{
-			in->aa -= in->Scan_stepsize_x;
-			in->Scan_x_trans = in->aa + in->x_vel * Delta_T;
+			//in->aa -= in->Scan_stepsize_x;
+			in->Scan_x_trans = in->Scan_x_temp - in->x_vel * Delta_T;
 			in->Scan_x_temp = (int)(in->Scan_x_trans) + 32767;
 		}
 	}
 
-	if((in->Scan_y_dist_virtual != in->Scan_y_temp - 32767) && (in->Scan_Y_Flag != 1))
+	if((in->Scan_y_dist_virtual != in->Scan_y_temp - 32767) && (in->Scan_Y_Flag != 1) ) // && (in->Scan_Y_Flag != 1)
 	{
-		if(in->Scan_y_dist_virtual > in->Scan_y_temp - 32767)
+		if(in->Scan_y_dist_virtual + 32767 > in->Scan_y_temp)
 		{
-			in->bb += in->Scan_stepsize_y;
-			in->Scan_y_trans = in->bb + in->y_vel * Delta_T;
-			in->Scan_y_temp = (int)(in->Scan_y_trans) + 32767;
+			//in->bb += in->Scan_stepsize_y;
+			in->Scan_y_trans = in->Scan_y_temp + in->y_vel * Delta_T;
+			in->Scan_y_temp = in->Scan_y_trans + 32767;
 		}
 		else
 		{
-			in->bb -= in->Scan_stepsize_y;
-			in->Scan_y_trans = in->bb + in->y_vel * Delta_T;
-			in->Scan_y_temp = (int)(in->Scan_y_trans) + 32767;
+			//in->bb -= in->Scan_stepsize_y;
+			in->Scan_y_trans = in->Scan_y_temp - in->y_vel * Delta_T;
+			in->Scan_y_temp = in->Scan_y_trans + 32767;
 		}
 	}
 
 
-	if(((in->Scan_x_dist_virtual + 32767) <= in->Scan_x_temp)){
+	if(((in->Scan_x_dist_virtual + 32767 - 10) <= in->Scan_x_temp) && ((in->Scan_x_dist_virtual + 32767 + 10) >= in->Scan_x_temp)){
 			in->Scan_X_Flag = 1;
 		}
 
-		if(((in->Scan_y_dist_virtual + 32767) <= in->Scan_y_temp)){
+	if(((in->Scan_y_dist_virtual + 32767 - 10) <= in->Scan_y_temp) && ((in->Scan_y_dist_virtual + 32767 + 10) >= in->Scan_y_temp)){
 			in->Scan_Y_Flag = 1;
-		}
+	}
 
 
 		if(in->Scan_X_Flag == 1 && in->Scan_Y_Flag == 1){
@@ -421,10 +420,11 @@ void Scanner_Line_Draw_Re(_Scanner_Control* in){
 		}
 
 
-//		if((((in->Scan_x_dist_virtual + 32767 - 10) <= in->Scan_x_temp) &&
-//				((in->Scan_x_dist_virtual + 32767 + 10) >= in->Scan_x_temp)) &&
-//				(((in->Scan_y_dist_virtual + 32767 - 10) <= in->Scan_y_temp) &&
-//						((in->Scan_y_dist_virtual + 32767 + 10) >= in->Scan_y_temp))){
+
+//		if((((in->Scan_x_dist_virtual + 32767 - in->Scan_stepsize_x) <= in->Scan_x_temp) &&
+//				((in->Scan_x_dist_virtual + 32767 + in->Scan_stepsize_x) >= in->Scan_x_temp)) &&
+//				(((in->Scan_y_dist_virtual + 32767 - in->Scan_stepsize_y) <= in->Scan_y_temp) &&
+//						((in->Scan_y_dist_virtual + 32767 + in->Scan_stepsize_y) >= in->Scan_y_temp))){
 //			in->Flag = 0;
 //		    Correction_Count_height = 0;
 //			Correction_Count_width = 0;
@@ -448,6 +448,7 @@ void Scanner_Line_Draw_RERE(_Scanner_Control* in)
 			in->Scan_stepsize_y = 1;
 		}
 	}
+
 	//////////////////////////////////////////////////////////////////////////
 
 	if(in->Scan_x_dist_virtual != in->Scan_x_temp - 32767)

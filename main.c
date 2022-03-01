@@ -82,6 +82,7 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart10;
 
 SRAM_HandleTypeDef hsram2;
 SRAM_HandleTypeDef hsram3;
@@ -95,6 +96,11 @@ SRAM_HandleTypeDef hsram3;
 //};
 
 //double PI = 3.14159265358979;
+
+uint8_t gggg[64] = {0x00};
+unsigned char RxBuffer[1];
+int abcdef = 0;
+
 float input_X = 0;
 float input_Y = 0;
 char *Test_Gcode[3][64] = {
@@ -125,13 +131,13 @@ char Stage_Y_Flag = 0;
 uint16_t Stage_X_Pulse_in = 0;
 uint16_t Stage_Y_Pulse_in = 0;
 
-uint32_t tm3_cnt = 0, old_tm3_cnt = 0;
+uint16_t tm3_cnt = 0, old_tm3_cnt = 0;
 uint16_t fpga_version;
 
-int16_t Enc_X_cnt;
-int16_t Enc_Y_cnt;
-int8_t Enc_X_rev;
-int8_t Enc_Y_rev;
+uint16_t Enc_X_cnt;
+uint16_t Enc_Y_cnt;
+int16_t Enc_X_rev;
+int16_t Enc_Y_rev;
 
 #define APP_RX_DATA_SIZE	64
 #define APP_TX_DATA_SIZE	64
@@ -162,6 +168,7 @@ static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_UART4_Init(void);
+static void MX_USART10_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -210,6 +217,7 @@ int main(void)
   MX_TIM3_Init();
   MX_UART4_Init();
   MX_USB_DEVICE_Init();
+  MX_USART10_UART_Init();
   /* USER CODE BEGIN 2 */
 
  //test_sram_memory();
@@ -218,7 +226,7 @@ int main(void)
 
 
   do {		// 2020.11.19 doohee : Wait until FPGA ready !!
-  	  fpga_version =  *((volatile uint16_t *)FPGA_BASE);
+  	  fpga_version =  *((volatile uint32_t *)FPGA_BASE);
     } while((fpga_version < 0x1013) || (fpga_version > 0x1110 ));
 
     fpga_cmd0.bit.P_LED1 = 1;	// P_LED4 Off
@@ -230,9 +238,11 @@ int main(void)
     __enable_irq();
     Scanner_Init(&Scanner_Control);
 
-    // 초기 ?��치�?? 중앙?���???????? ?��치시?���???????? ?��?��
+    // 초기 ?��치�?? 중앙?���??????????? ?��치시?���??????????? ?��?��
     Scanner_Control.Scan_x_temp = 32767;
     Scanner_Control.Scan_y_temp = 32767;
+
+    HAL_UART_Receive_IT(&huart10, RxBuffer, 1);
 
 
   /*  for(int i =0;i<3;i++){
@@ -255,18 +265,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	  //CDC_Transmit_HS(gggg,strlen(gggg));
+	  //HAL_Delay(1000);
+
 	  /*Pulse Test */
 	  fpga_status2.all = *((volatile uint16_t *)FPGA_BASE + 2);
 	  Internal_Cnt.all = *((volatile uint16_t *)FPGA_BASE + 6);
 	  Pulse_From_FPGA.all = *((volatile uint16_t *)FPGA_BASE + 7);
 
-
-	  // 나중에 값 바뀌었을 때만 넣어주도록 수정해
+	  // ?��중에 �??? 바�?�었?�� ?���??? ?��?��주도�??? ?��?��?��
 	  *((volatile uint16_t *)FPGA_BASE + 49) = ENC_Clk_Speed.all;
 
 
 		/* Homing Check */
-		if(fpga_status2.bit.STG_Homing == 1)
+	    if(fpga_status2.bit.STG_Homing == 1)
 		{
 			fpga_cmd0.bit.STG_Homing_G = 0;
 			*((volatile uint16_t *)FPGA_BASE + 32) = fpga_cmd0.all;
@@ -304,7 +316,7 @@ int main(void)
 	  		*((volatile uint16_t *)FPGA_BASE + 32) = fpga_cmd0.all;
 	  	}
 
-	  	 /* cmd�?? 1?�� ?��?��?��?�� Limit?�� ?��?��?��?�� 경우*/
+	  	 /* cmd�????? 1?�� ?��?��?��?�� Limit?�� ?��?��?��?�� 경우*/
 	  	if(Limit_Check == 0){
 	  	if((fpga_status2.bit.LMT_XP == 1) || (fpga_status2.bit.LMT_XN == 1) || (fpga_status2.bit.LMT_YP == 1) || (fpga_status2.bit.LMT_YN == 1)){
 	  		Limit_Check = 1;
@@ -338,7 +350,7 @@ int main(void)
 	  int *pRxBuffer = (int*)UserRxBufferFS;
 	  int *pBufOld = (int*)oldRxBuf;
 
-	  // UserRxBufferFS ?�� ?��로운 명령?�� ?��?��?�� �????????
+	  // UserRxBufferFS ?�� ?��로운 명령?�� ?��?��?�� �???????????
 	  if(*(pBufOld+0) != *(pRxBuffer+0))
 	  {
 	  //if(oldRxBuf[0] != UserRxBufferFS[0]) {
@@ -388,7 +400,7 @@ int main(void)
 			/* Test Triangle */
 			if(Test_Triangle == 1 && Scanner_Control.Flag == 0){
 					  if(Test_Count == 0){
-						  // ?��기에?���? 만든 Gcode �?분에?�� x�?�?, y�?�? �??��?���? ???��?��
+						  // ?��기에?���???? 만든 Gcode �????분에?�� x�????�????, y�????�???? �?????��?���???? ???��?��
 						  /////////////////////////////////////////////////////////////
 						/*  Change_Gcode = (char *)Test_Gcode[0][4];
 						  Gcode_X = strtol(Change_Gcode, NULL,16);
@@ -407,7 +419,7 @@ int main(void)
 						  Scanner_Control.Flag = 1;
 						  Test_Count = 1;
 					  }else if(Test_Count == 1){
-						  // ?��기에?���? 만든 Gcode �?분에?�� x�?�?, y�?�? �??��?���? ???��?��
+						  // ?��기에?���???? 만든 Gcode �????분에?�� x�????�????, y�????�???? �?????��?���???? ???��?��
 						  /////////////////////////////////////////////////////////////
 						  Gcode_X = strtol(Test_Gcode[1][4], NULL,16);
 						  Gcode_Y = strtol(Test_Gcode[1][8], NULL,16);
@@ -421,7 +433,7 @@ int main(void)
 						  Scanner_Control.Flag = 1;
 						  Test_Count = 2;
 					  }else if(Test_Count == 2){
-						  // ?��기에?���? 만든 Gcode �?분에?�� x�?�?, y�?�? �??��?���? ???��?��
+						  // ?��기에?���???? 만든 Gcode �????분에?�� x�????�????, y�????�???? �?????��?���???? ???��?��
 						  /////////////////////////////////////////////////////////////
 						  Gcode_X = strtol(Test_Gcode[2][4], NULL,16);
 						  Gcode_Y = strtol(Test_Gcode[2][8], NULL,16);
@@ -447,7 +459,7 @@ int main(void)
 			else // Laser_Flag == 0
 			{
 				fpga_cmd0.bit.Laser_Ctrl = 0;
-				*((volatile uint16_t *)FPGA_BASE + 32) = fpga_cmd0.all;  // ?�� �?�? ?��중에 ?��?��?��
+				*((volatile uint16_t *)FPGA_BASE + 32) = fpga_cmd0.all;  // ?�� �????�???? ?��중에 ?��?��?��
 			}
 
 			/* Scanner_ED bit Check */
@@ -565,7 +577,6 @@ int main(void)
 
 						input_X = cos(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
 						input_Y = sin(Scanner_Control.Angle) * Scanner_Control.Scan_radius;
-						//aaaaaa+=120;
 					}
 				}
 				else{
@@ -594,6 +605,11 @@ int main(void)
 				Scanner_Control.Flag = 1;
 
 				Test_Count++;
+				if(Test_Count == 180){
+					Gcode_Y = 1;
+
+				}
+
 				if(Scanner_Control.Figure_Angle >= 7){
 					if(Test_Count > 720){
 							Test_Count = 0;
@@ -615,11 +631,11 @@ int main(void)
 			}
 
 			// Encoder check
-			Enc_X_cnt = *((volatile uint16_t *)FPGA_BASE + 3);
-			Enc_Y_cnt = *((volatile uint16_t *)FPGA_BASE + 4);
+			Enc_X_cnt = *((volatile uint32_t *)FPGA_BASE + 3);
+			Enc_Y_cnt = *((volatile uint32_t *)FPGA_BASE + 4);
 
-			Enc_X_rev = *((volatile uint16_t *)FPGA_BASE + 5) & 0x00FF;
-			Enc_Y_rev = (*((volatile uint16_t *)FPGA_BASE + 5) & 0xFF00) >> 8;
+			Enc_X_rev = *((volatile uint32_t *)FPGA_BASE + 5) & 0x00FF;
+			Enc_Y_rev = (*((volatile uint32_t *)FPGA_BASE + 5) & 0xFF00) >> 8;
 
 			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, tm3_cnt & 0xFFF);
 			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (0x1000-tm3_cnt) & 0xFFF);
@@ -1019,6 +1035,54 @@ static void MX_UART4_Init(void)
 
 }
 
+/**
+  * @brief USART10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART10_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART10_Init 0 */
+
+  /* USER CODE END USART10_Init 0 */
+
+  /* USER CODE BEGIN USART10_Init 1 */
+
+  /* USER CODE END USART10_Init 1 */
+  huart10.Instance = USART10;
+  huart10.Init.BaudRate = 115200;
+  huart10.Init.WordLength = UART_WORDLENGTH_8B;
+  huart10.Init.StopBits = UART_STOPBITS_1;
+  huart10.Init.Parity = UART_PARITY_NONE;
+  huart10.Init.Mode = UART_MODE_TX_RX;
+  huart10.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart10.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart10.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart10.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart10.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart10, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart10, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART10_Init 2 */
+
+  /* USER CODE END USART10_Init 2 */
+
+}
+
 /* FMC initialization function */
 static void MX_FMC_Init(void)
 {
@@ -1226,6 +1290,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		tm3_cnt++;
 	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	 if(huart -> Instance == huart4.Instance)
+	 {
+        if(RxBuffer[0] == 'A'){
+        		abcdef = 1;
+        }
+        else if(RxBuffer[0] == 'B'){
+        		abcdef = 2;
+        }
+
+        HAL_UART_Receive_IT(&huart4, RxBuffer, 1);
+	 }
 }
 
 
